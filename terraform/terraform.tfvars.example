@@ -1,0 +1,23 @@
+# Copy this file to terraform.tfvars and customize
+
+app_name    = "stock-icc-tracker"
+environment = "dev"
+aws_region  = "us-east-1"
+
+# Email for alerts (must be verified in AWS SES first)
+alert_email = "your-email@example.com"
+
+# Analysis schedule (cron format)
+analysis_schedule = "cron(0 14,20 ? * MON-FRI *)"
+
+# Enable/disable scheduled analysis
+enable_scheduled_analysis = true
+
+# Stocks to analyze
+default_watchlist = [
+  "AAPL", "TSLA", "NVDA", "AMD", "MSFT", 
+  "GOOGL", "AMZN", "META", "SPY", "QQQ"
+]
+
+# Timeframes to analyze
+default_timeframes = ["1d", "4h", "1h"]
