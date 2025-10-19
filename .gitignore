@@ -217,6 +217,7 @@ __marimo__/
 
 # Terraform plan files
 *.tfplan
+*tfplan
 
 # Terraform lock files
 .terraform.lock.hcl
