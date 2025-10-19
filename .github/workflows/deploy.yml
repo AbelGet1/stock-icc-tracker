@@ -1,0 +1,38 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.3.0
+
+      - name: Initialize Terraform
+        run: terraform init
+        working-directory: terraform/
+
+      - name: Validate Terraform
+        run: terraform validate
+        working-directory: terraform/
+
+      - name: Apply Terraform
+        run: terraform apply -auto-approve
+        working-directory: terraform/
+
+      - name: Deploy Lambda function
+        run: |
+          zip -r stock_analyzer.zip src/lambda/stock_analyzer/
+          aws lambda update-function-code \
+            --function-name stock-icc-tracker-analyzer \
+            --zip-file fileb://stock_analyzer.zip
