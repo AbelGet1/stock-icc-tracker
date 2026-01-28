@@ -1,23 +1,33 @@
-# Copy this file to terraform.tfvars and customize
+# Stock ICC Tracker - Terraform Variables Example
+# Copy this file to terraform.tfvars and customize as needed
 
-app_name    = "stock-icc-tracker"
+app_name = "stock-icc-tracker"
 environment = "dev"
-aws_region  = "us-east-1"
+aws_region = "us-east-1"
 
-# Email for alerts (must be verified in AWS SES first)
-alert_email = "your-email@example.com"
-
-# Analysis schedule (cron format)
-analysis_schedule = "cron(0 14,20 ? * MON-FRI *)"
-
-# Enable/disable scheduled analysis
+# Analysis Configuration
+analysis_schedule = "cron(0 14,20 ? * MON-FRI *)"  # 9 AM and 3 PM EST on weekdays
 enable_scheduled_analysis = true
+default_watchlist = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT"]
+default_timeframes = ["1d", "4h"]
 
-# Stocks to analyze
-default_watchlist = [
-  "AAPL", "TSLA", "NVDA", "AMD", "MSFT", 
-  "GOOGL", "AMZN", "META", "SPY", "QQQ"
-]
+# Alert Configuration
+alert_email = ""  # Must be verified in AWS SES
 
-# Timeframes to analyze
-default_timeframes = ["1d", "4h", "1h"]
+# Cost Optimization Settings (Default: Optimized for minimal cost)
+# These defaults are set to minimize costs while maintaining functionality
+
+lambda_memory_size = 256              # Reduced from 512 MB (saves ~50% compute cost)
+lambda_timeout = 120                   # Reduced from 300 seconds
+cloudwatch_log_retention_days = 3     # Reduced from 7 days
+enable_s3_versioning = false           # Disabled to save storage costs
+enable_dynamodb_pitr = false           # Disabled to save ~20% DynamoDB costs
+enable_dynamodb_gsi = false            # Disabled to save read/write costs
+
+# For production with higher reliability requirements, you may want:
+# lambda_memory_size = 512
+# lambda_timeout = 300
+# cloudwatch_log_retention_days = 7
+# enable_s3_versioning = true
+# enable_dynamodb_pitr = true
+# enable_dynamodb_gsi = true

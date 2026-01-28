@@ -1,5 +1,17 @@
 terraform {
   required_version = ">= 1.0"
+  
+  # Backend configuration - uncomment and configure for remote state
+  # For local development, state is stored locally
+  # For production, use S3 backend:
+  # backend "s3" {
+  #   bucket         = "your-terraform-state-bucket"
+  #   key            = "stock-icc-tracker/terraform.tfstate"
+  #   region         = "us-east-1"
+  #   encrypt        = true
+  #   dynamodb_table = "terraform-state-lock"
+  # }
+  
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -39,6 +51,7 @@ resource "aws_s3_bucket" "app_storage" {
 }
 
 resource "aws_s3_bucket_versioning" "app_storage" {
+  count  = var.enable_s3_versioning ? 1 : 0
   bucket = aws_s3_bucket.app_storage.id
   versioning_configuration {
     status = "Enabled"
@@ -86,14 +99,17 @@ resource "aws_dynamodb_table" "stock_patterns" {
     type = "N"
   }
 
-  global_secondary_index {
-    name     = "ConfidenceIndex"
-    hash_key = "confidence_score"
-    projection_type = "ALL"
+  dynamic "global_secondary_index" {
+    for_each = var.enable_dynamodb_gsi ? [1] : []
+    content {
+      name     = "ConfidenceIndex"
+      hash_key = "confidence_score"
+      projection_type = "ALL"
+    }
   }
 
   point_in_time_recovery {
-    enabled = true
+    enabled = var.enable_dynamodb_pitr
   }
 }
 
@@ -109,7 +125,7 @@ resource "aws_dynamodb_table" "subscriptions" {
   }
 
   point_in_time_recovery {
-    enabled = true
+    enabled = var.enable_dynamodb_pitr
   }
 }
 
@@ -201,8 +217,8 @@ resource "aws_lambda_function" "stock_analyzer" {
   handler         = "handler.main"
   source_code_hash = data.archive_file.stock_analyzer.output_base64sha256
   runtime          = "python3.9"
-  timeout          = 300
-  memory_size      = 512
+  timeout          = var.lambda_timeout
+  memory_size      = var.lambda_memory_size
 
   environment {
     variables = {
@@ -216,7 +232,7 @@ resource "aws_lambda_function" "stock_analyzer" {
 # CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "lambda_logs" {
   name              = "/aws/lambda/${aws_lambda_function.stock_analyzer.function_name}"
-  retention_in_days = 7
+  retention_in_days = var.cloudwatch_log_retention_days
 }
 
 # EventBridge rule for scheduled analysis

@@ -13,6 +13,7 @@ The Stock ICC Tracker is a serverless application designed to analyze stock data
 - **Alerts**: Sends email alerts for high-confidence patterns via AWS SES.
 - **Extensible**: Easily customizable for additional patterns or data sources.
 - **Infrastructure as Code**: Managed using Terraform.
+- **Cost Optimized**: Configured for minimal AWS costs (~$0-2/month with free tier, ~$2-6/month after)
 
 ## Project Structure
 
@@ -68,14 +69,30 @@ The Stock ICC Tracker is a serverless application designed to analyze stock data
 
 
 ##### Deployment 
-1. Deploy Infrastructure using Terraform 
-    terraform apply -auto-approve
 
-2. Deploy the Lambda function 
-    zip -r stock_analyzer.zip src/lambda/stock_analyzer/
-    aws lambda update-function-code \
-        --function-name stock-icc-tracker-analyzer \
-        --zip-file fileb://stock_analyzer.zip
+1. Configure Terraform variables (optional, defaults are cost-optimized):
+   ```bash
+   cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+   # Edit terraform.tfvars to customize settings
+   ```
+
+2. Deploy Infrastructure using Terraform:
+   ```bash
+   cd terraform
+   terraform init
+   terraform plan  # Review changes
+   terraform apply
+   ```
+
+3. Deploy the Lambda function (if updating code):
+   ```bash
+   zip -r stock_analyzer.zip src/lambda/stock_analyzer/
+   aws lambda update-function-code \
+       --function-name stock-icc-tracker-analyzer \
+       --zip-file fileb://stock_analyzer.zip
+   ```
+
+**Note**: The default configuration is optimized for minimal cost. See `COST_ANALYSIS.md` for details.
 
 
 ##### Usage 

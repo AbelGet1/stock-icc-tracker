@@ -441,14 +441,14 @@ def main(event, context):
         
         response = {
             'statusCode': 200,
-            'body': {
+            'body': json.dumps({
                 'message': f'Analysis complete',
                 'symbols_analyzed': len(symbols),
                 'timeframes': timeframes,
                 'total_analyses': len(results),
                 'alerts_sent': alerts_sent,
                 'results': results
-            }
+            }, cls=DecimalEncoder)
         }
         
         return response
@@ -457,8 +457,8 @@ def main(event, context):
         logger.error(f"Lambda handler error: {e}")
         return {
             'statusCode': 500,
-            'body': {
+            'body': json.dumps({
                 'error': str(e),
                 'message': 'Analysis failed'
-            }
+            })
         }
