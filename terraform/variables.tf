@@ -85,3 +85,10 @@ variable "enable_dynamodb_gsi" {
   type        = bool
   default     = false  # Disabled for cost savings
 }
+
+# Security variables
+variable "ses_sender_email" {
+  description = "Verified SES email address for sending alerts (restricts Lambda to only send from this address)"
+  type        = string
+  default     = ""  # Must be set and verified in SES before use
+}

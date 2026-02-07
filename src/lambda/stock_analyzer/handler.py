@@ -3,9 +3,14 @@ import boto3
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+import sys
 from typing import Dict, List, Optional
 from decimal import Decimal
 import logging
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from utils.indicators import calculate_all_indicators, get_ml_features
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -67,10 +72,29 @@ class ICCDetector:
             indication = self.detect_indication(data)
             correction = self.detect_correction(data, indication)
             continuation = self.detect_continuation(data, indication, correction)
-            
+
+            # Calculate technical indicators
+            try:
+                indicators = calculate_all_indicators(data)
+                ml_features = get_ml_features(data)
+            except Exception as e:
+                logger.warning(f"Error calculating indicators for {symbol}: {e}")
+                indicators = {}
+                ml_features = {}
+
             # Calculate overall confidence
             confidence_score = self.calculate_confidence(indication, correction, continuation)
-            
+
+            # Extract key indicators for response
+            key_indicators = {
+                "rsi_14": indicators.get("rsi_14"),
+                "macd_signal": indicators.get("interpretations", {}).get("macd", "unknown"),
+                "stochastic_k": indicators.get("stochastic_k"),
+                "bb_squeeze": indicators.get("bb_squeeze", False),
+                "volume_ratio": indicators.get("volume_ratio"),
+                "atr_14": indicators.get("atr_14")
+            }
+
             # Prepare result
             result = {
                 "symbol": symbol.upper(),
@@ -83,7 +107,10 @@ class ICCDetector:
                 "continuation": continuation,
                 "confidence_score": confidence_score,
                 "pattern_status": self.determine_pattern_status(indication, correction, continuation),
-                "recommendation": self.generate_recommendation(confidence_score, indication)
+                "recommendation": self.generate_recommendation(confidence_score, indication),
+                "key_indicators": key_indicators,
+                "technical_indicators": indicators,
+                "ml_features": ml_features
             }
             
             # Store analysis result

@@ -1,0 +1,19 @@
+# ML Model Training Dependencies
+# Used by GitHub Actions for weekly model training
+
+# Data fetching
+yfinance>=0.2.18
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+joblib>=1.3.0
+
+# AWS SDK for S3 uploads
+boto3>=1.28.0
+
+# Progress bars (optional but helpful)
+tqdm>=4.65.0

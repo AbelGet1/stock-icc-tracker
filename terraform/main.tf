@@ -40,6 +40,9 @@ provider "aws" {
   }
 }
 
+# Get current AWS account ID for IAM policies
+data "aws_caller_identity" "current" {}
+
 # Generate random suffix for unique resource names
 resource "random_id" "suffix" {
   byte_length = 4
@@ -196,7 +199,14 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "ses:SendEmail",
           "ses:SendRawEmail"
         ]
-        Resource = "*"
+        # Restrict SES to only verified identities in this region/account
+        # This prevents sending from arbitrary email addresses
+        Resource = "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/*"
+        Condition = {
+          StringEquals = {
+            "ses:FromAddress" = var.ses_sender_email
+          }
+        }
       }
     ]
   })

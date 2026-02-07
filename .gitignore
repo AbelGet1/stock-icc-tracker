@@ -224,3 +224,9 @@ __marimo__/
 
 # Terraform working directory
 .terraform/
+
+# ML models (large binary files)
+models/
+
+# Claude Code local settings
+.claude/
