@@ -126,7 +126,7 @@ async def rate_limit_dependency(request: Request):
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",") if os.environ.get("ALLOWED_ORIGINS") else []
 
 app = FastAPI(
-    title="Stock ICC Tracker API",
+    title="StockScout API",
     version="2.0.0",
     description="ML-powered stock analysis with configurable risk modes",
     dependencies=[Depends(rate_limit_dependency)],  # Apply rate limiting globally
@@ -253,9 +253,9 @@ lambda_client = boto3.client("lambda", region_name=AWS_REGION)
 dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 
 # Environment variables
-LAMBDA_FUNCTION_NAME = os.environ.get('LAMBDA_FUNCTION_NAME', 'stock-icc-tracker-analyzer')
-PATTERNS_TABLE_NAME = os.environ.get('PATTERNS_TABLE_NAME', 'stock-icc-tracker-patterns')
-SUBSCRIPTIONS_TABLE_NAME = os.environ.get('SUBSCRIPTIONS_TABLE_NAME', 'stock-icc-tracker-subscriptions')
+LAMBDA_FUNCTION_NAME = os.environ.get('LAMBDA_FUNCTION_NAME', 'stockscout-analyzer')
+PATTERNS_TABLE_NAME = os.environ.get('PATTERNS_TABLE_NAME', 'stockscout-patterns')
+SUBSCRIPTIONS_TABLE_NAME = os.environ.get('SUBSCRIPTIONS_TABLE_NAME', 'stockscout-subscriptions')
 
 class AnalysisRequest(BaseModel):
     symbols: List[str] = Field(..., max_length=MAX_SYMBOLS_PER_REQUEST)
@@ -343,7 +343,7 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "Stock ICC Tracker API",
+        "service": "StockScout API",
         "version": "1.0.0"
     }
 

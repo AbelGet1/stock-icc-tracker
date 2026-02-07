@@ -1,7 +1,7 @@
 variable "app_name" {
   description = "Application name used for resource naming"
   type        = string
-  default     = "stock-icc-tracker"
+  default     = "stockscout"
 }
 
 variable "environment" {

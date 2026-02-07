@@ -67,7 +67,7 @@ jobs:
 
       - name: Deploy Lambda function
         run: |
-          FUNCTION_NAME=$(terraform output -raw lambda_function_name 2>/dev/null || echo "stock-icc-tracker-analyzer")
+          FUNCTION_NAME=$(terraform output -raw lambda_function_name 2>/dev/null || echo "stockscout-analyzer")
           aws lambda update-function-code \
             --function-name "$FUNCTION_NAME" \
             --zip-file fileb://stock_analyzer.zip

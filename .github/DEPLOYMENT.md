@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide explains how to set up and deploy the Stock ICC Tracker application using GitHub Actions.
+This guide explains how to set up and deploy the StockScout application using GitHub Actions.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ The current Terraform configuration uses **local state** by default. For product
    terraform {
      backend "s3" {
        bucket         = "your-terraform-state-bucket"
-       key            = "stock-icc-tracker/terraform.tfstate"
+       key            = "stockscout/terraform.tfstate"
        region         = "us-east-1"
        encrypt        = true
        dynamodb_table = "terraform-state-lock"  # Optional: for state locking
@@ -48,7 +48,7 @@ The current Terraform configuration uses **local state** by default. For product
 Create a `terraform/terraform.tfvars` file (or use GitHub Secrets for sensitive values):
 
 ```hcl
-app_name = "stock-icc-tracker"
+app_name = "stockscout"
 environment = "prod"
 aws_region = "us-east-1"
 enable_scheduled_analysis = true
@@ -105,7 +105,7 @@ terraform apply
 cd ..
 zip -r stock_analyzer.zip src/lambda/stock_analyzer/
 aws lambda update-function-code \
-  --function-name stock-icc-tracker-analyzer \
+  --function-name stockscout-analyzer \
   --zip-file fileb://stock_analyzer.zip
 ```
 

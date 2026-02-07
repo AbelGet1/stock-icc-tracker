@@ -6,7 +6,7 @@ terraform {
   # For production, use S3 backend:
   # backend "s3" {
   #   bucket         = "your-terraform-state-bucket"
-  #   key            = "stock-icc-tracker/terraform.tfstate"
+  #   key            = "stockscout/terraform.tfstate"
   #   region         = "us-east-1"
   #   encrypt        = true
   #   dynamodb_table = "terraform-state-lock"

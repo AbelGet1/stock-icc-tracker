@@ -22,9 +22,9 @@ s3 = boto3.client('s3')
 ses = boto3.client('ses')
 
 # Environment variables
-PATTERNS_TABLE = os.environ.get('PATTERNS_TABLE', 'stock-icc-tracker-patterns')
-STORAGE_BUCKET = os.environ.get('STORAGE_BUCKET', 'stock-icc-tracker-storage')
-SUBSCRIPTIONS_TABLE = os.environ.get('SUBSCRIPTIONS_TABLE', 'stock-icc-tracker-subscriptions')
+PATTERNS_TABLE = os.environ.get('PATTERNS_TABLE', 'stockscout-patterns')
+STORAGE_BUCKET = os.environ.get('STORAGE_BUCKET', 'stockscout-storage')
+SUBSCRIPTIONS_TABLE = os.environ.get('SUBSCRIPTIONS_TABLE', 'stockscout-subscriptions')
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -412,7 +412,7 @@ Continuation: {"✅" if analysis.get('continuation', {}).get('detected') else "�
 ⏰ Analysis Time: {analysis['timestamp']}
 📈 Timeframe: {analysis['timeframe']}
 
-This is an automated alert from Stock ICC Tracker.
+This is an automated alert from StockScout.
 """
         
         # Note: You need to set up and verify an email in AWS SES

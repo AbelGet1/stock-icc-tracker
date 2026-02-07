@@ -48,7 +48,7 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "S3_BUCKET=${{ secrets.S3_BUCKET || 'stock-icc-tracker-storage' }}" >> $GITHUB_ENV
+          echo "S3_BUCKET=${{ secrets.S3_BUCKET || 'stockscout-storage' }}" >> $GITHUB_ENV
           echo "PYTHONPATH=${{ github.workspace }}/src" >> $GITHUB_ENV
 
       - name: Run model training
@@ -140,7 +140,7 @@ jobs:
           import os
 
           s3 = boto3.client('s3')
-          bucket = os.environ.get('S3_BUCKET', 'stock-icc-tracker-storage')
+          bucket = os.environ.get('S3_BUCKET', 'stockscout-storage')
 
           with tempfile.TemporaryDirectory() as tmpdir:
               model_path = os.path.join(tmpdir, 'model.joblib')
@@ -156,4 +156,4 @@ jobs:
                   exit(1)
           "
         env:
-          S3_BUCKET: ${{ secrets.S3_BUCKET || 'stock-icc-tracker-storage' }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET || 'stockscout-storage' }}

@@ -1,142 +1,112 @@
-# Stock ICC Tracker
+# StockScout
 
-Serverless Stock ICC Pattern Tracker - Reusable Trading Strategy Template
+**Daily stock tracker with ML-powered insights for informed decision-making.**
 
-## Overview
+StockScout analyzes S&P 500 stocks using machine learning to identify favorable market conditions. It's designed as an educational tool to help you understand market signals - not as a trading signal generator.
 
-The Stock ICC Tracker is a serverless application designed to analyze stock data and detect ICC (Indication, Correction, Continuation) patterns. It provides trading recommendations based on confidence scores and sends alerts for high-confidence patterns.
+## What It Does
 
-## Features
+- Analyzes stocks using 15+ technical indicators (RSI, MACD, Bollinger Bands, etc.)
+- Predicts probability of 1%+ gain in the next 5 trading days
+- Provides confidence-based signals with beginner-friendly explanations
+- Runs on serverless AWS infrastructure for minimal cost (~$0.30/month)
 
-- **Stock Analysis**: Detects ICC patterns using historical stock data.
-- **Serverless Architecture**: Built on AWS Lambda, DynamoDB, and S3.
-- **Alerts**: Sends email alerts for high-confidence patterns via AWS SES.
-- **Extensible**: Easily customizable for additional patterns or data sources.
-- **Infrastructure as Code**: Managed using Terraform.
-- **Cost Optimized**: Configured for minimal AWS costs (~$0-2/month with free tier, ~$2-6/month after)
+## User Modes
 
-## Project Structure
+| Mode | Precision | Best For |
+|------|-----------|----------|
+| **Beginner** | 90% | New investors - only high-confidence signals |
+| **Balanced** | 83% | Most users - good balance of signals and accuracy |
+| **Moderate** | 74% | Experienced - more signals, standard threshold |
+| **Aggressive** | 64% | Active traders - catches more opportunities |
 
+## Quick Start
+
+```bash
+# Clone and install
+git clone https://github.com/your-username/stockscout.git
+cd stockscout
+pip install -r requirements.txt
+
+# Run locally
+uvicorn src.api.main:app --reload
+
+# Access API at http://127.0.0.1:8000
 ```
-.
-├── .github/workflows/   # CI/CD workflows
-├── docker/              # Docker configuration
-├── scripts/             # Helper scripts for deployment and setup
-├── src/                 # Source code
-│   ├── api/             # FastAPI application
-│   ├── lambda/          # AWS Lambda functions
-│   └── utils/           # Utility modules
-├── terraform/           # Terraform configuration for AWS resources
-├── tests/               # Unit tests
-├── Dockerfile           # Dockerfile for local development
-├── requirements.txt     # Python dependencies
-└── README.md            # Project documentation
+
+## API Usage
+
+### Get Prediction
+```bash
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["AAPL", "MSFT"], "mode": "balanced"}'
 ```
 
-## Getting Started
+### Response
+```json
+{
+  "predictions": [
+    {
+      "symbol": "AAPL",
+      "probability": 0.72,
+      "signal": true,
+      "signal_strength": "strong",
+      "interpretation": "Strong positive indicators - favorable market conditions"
+    }
+  ],
+  "disclaimer": "This is not investment advice."
+}
+```
 
-### Prerequisites
+## Endpoints
 
-- Python 3.9+
-- AWS CLI configured with appropriate permissions
-- Terraform 1.3.0+
-- Docker (optional for local development)
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Health check |
+| `GET /modes` | Available user modes and thresholds |
+| `GET /model/info` | Current model version and metrics |
+| `POST /predict` | Get ML predictions for stocks |
+| `GET /predict/{symbol}` | Quick single-stock prediction |
+| `GET /threshold-analysis` | Precision/recall at different thresholds |
 
-### Installation
+## Deployment
 
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/your-username/stock-icc-tracker.git
-   cd stock-icc-tracker
+### AWS (Serverless)
+```bash
+cd terraform
+terraform init
+terraform apply
+```
 
-2. Install Dependencies 
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
+### Environment Variables
+Copy `.env.example` to `.env` and configure:
+- `API_KEY` - Enable authentication (recommended for production)
+- `RATE_LIMIT_REQUESTS` - Requests per hour (default: 100)
+- `MAX_SYMBOLS_PER_REQUEST` - Symbols per request (default: 5)
 
-3. Setup env variables 
-    cp .env.example .env
+## Cost Optimization
 
-4. Initialize Terraform
-    cd terraform
-    terraform init
+Designed for minimal AWS costs:
+- Lambda: Pay only for execution time
+- DynamoDB: On-demand pricing
+- No always-on servers
+- **Target: <$2/month**
 
+## Model Performance
 
-###### Running Locally 
-1. Start the FastAPI server: 
-    uvicorn src.api.main:app --reload
+Current model (v1.2.0):
+- Training data: 2+ years of S&P 500 top 50 stocks
+- Cross-validation F1: ~56%
+- At 0.55 threshold: 83% precision, 55% recall
 
-2. Access the API at http://127.0.0.1:8000.
+## Important Disclaimer
 
+This tool provides **educational market analysis, not investment advice**.
+- Past performance does not predict future results
+- All investments carry risk of loss
+- Consult a licensed financial advisor before investing
 
-##### Deployment 
+## License
 
-1. Configure Terraform variables (optional, defaults are cost-optimized):
-   ```bash
-   cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-   # Edit terraform.tfvars to customize settings
-   ```
-
-2. Deploy Infrastructure using Terraform:
-   ```bash
-   cd terraform
-   terraform init
-   terraform plan  # Review changes
-   terraform apply
-   ```
-
-3. Deploy the Lambda function (if updating code):
-   ```bash
-   zip -r stock_analyzer.zip src/lambda/stock_analyzer/
-   aws lambda update-function-code \
-       --function-name stock-icc-tracker-analyzer \
-       --zip-file fileb://stock_analyzer.zip
-   ```
-
-**Note**: The default configuration is optimized for minimal cost. See `COST_ANALYSIS.md` for details.
-
-
-##### Usage 
-
-API Endpoints
-- Analyze Stocks: /analyze
-    Request: 
-        {
-            "symbols": ["AAPL", "TSLA"],
-            "timeframes": ["1d", "4h"]
-        }
-
-    Response:
-        {
-        "results": [
-            {
-            "symbol": "AAPL",
-            "confidence_score": 0.85,
-            "recommendation": "STRONG_BUY"
-            }
-          ]
-        }
-
-Subscribe to Alerts: /subscribe
-    Request:
-        {
-        "email": "user@example.com",
-        "symbols": ["AAPL", "TSLA"]
-        }
-
-Scheduled Analysis
-The analysis runs automatically based on the schedule defined in the Terraform configuration (cron(0 14,20 ? * MON-FRI *)).
-
-##### Testing
-Run unit tests using pytest: pytest tests/
-
-
-#### CI/CD
-- Testing Workflow: test.yml
-- Deployment Workflow: deploy.yml
-
-#### Contributing
-Contributions are welcome! Please open an issue or submit a pull request.
-
-#### License
-This project is licensed under the MIT License.
-
+MIT License

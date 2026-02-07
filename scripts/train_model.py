@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ML Model Training Script for Stock ICC Tracker
+ML Model Training Script for StockScout
 
 This script:
 1. Fetches historical stock data for S&P 500 top 50 stocks
@@ -80,7 +80,7 @@ class ModelTrainer:
             s3_bucket: S3 bucket name for storing models
             local_mode: If True, save locally instead of S3
         """
-        self.s3_bucket = s3_bucket or os.environ.get('S3_BUCKET', 'stock-icc-tracker-storage')
+        self.s3_bucket = s3_bucket or os.environ.get('S3_BUCKET', 'stockscout-storage')
         self.local_mode = local_mode
         self.s3_client = None if local_mode else boto3.client('s3')
         self.model = None
@@ -523,7 +523,7 @@ class ModelTrainer:
 
 def main():
     """Main training entry point"""
-    parser = argparse.ArgumentParser(description='Train Stock ICC Tracker ML Model')
+    parser = argparse.ArgumentParser(description='Train StockScout ML Model')
     parser.add_argument('--test', action='store_true', help='Use test subset (5 stocks, faster)')
     parser.add_argument('--stocks', type=str, help='Comma-separated list of stock symbols')
     parser.add_argument('--local', action='store_true', help='Save model locally instead of S3')
