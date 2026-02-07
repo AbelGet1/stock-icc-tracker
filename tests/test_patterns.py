@@ -107,8 +107,8 @@ def test_calculate_fibonacci_levels():
     assert levels['1.0'] == 100.0
     assert levels['0.5'] == 125.0
     
-    # Verify levels are in descending order
-    level_values = [levels[k] for k in sorted(levels.keys(), key=float, reverse=True)]
+    # Verify levels are in descending order when keys are ascending
+    level_values = [levels[k] for k in sorted(levels.keys(), key=float)]
     assert level_values == sorted(level_values, reverse=True)
 
 

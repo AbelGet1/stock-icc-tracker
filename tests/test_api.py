@@ -44,12 +44,11 @@ def test_analyze_endpoint_success(mock_lambda):
 @patch('src.api.main.lambda_client')
 def test_analyze_endpoint_lambda_not_found(mock_lambda):
     """Test Lambda function not found error"""
-    import botocore.exceptions
-    mock_lambda.invoke.side_effect = botocore.exceptions.ClientError(
-        {'Error': {'Code': 'ResourceNotFoundException'}},
-        'Invoke'
-    )
-    
+    # Create a mock exception class that mimics the Lambda client's exception
+    mock_exception = type('ResourceNotFoundException', (Exception,), {})
+    mock_lambda.exceptions.ResourceNotFoundException = mock_exception
+    mock_lambda.invoke.side_effect = mock_exception("Function not found")
+
     response = client.post(
         "/analyze",
         json={
@@ -57,7 +56,7 @@ def test_analyze_endpoint_lambda_not_found(mock_lambda):
             "timeframes": ["1d"]
         }
     )
-    
+
     assert response.status_code == 503
 
 

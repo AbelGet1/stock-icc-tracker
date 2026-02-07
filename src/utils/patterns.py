@@ -58,7 +58,7 @@ def detect_volume_spike(data: pd.DataFrame, threshold: float = 1.5) -> bool:
     avg_volume = data['Volume'].tail(20).mean()
     current_volume = data['Volume'].iloc[-1]
     
-    return current_volume > (avg_volume * threshold)
+    return bool(current_volume > (avg_volume * threshold))
 
 def calculate_momentum(data: pd.DataFrame, periods: int = 5) -> float:
     """
