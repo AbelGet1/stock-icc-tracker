@@ -26,11 +26,12 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 
+import time
+
 import boto3
 import joblib
 import numpy as np
 import pandas as pd
-import yfinance as yf
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 try:
     from xgboost import XGBClassifier
@@ -93,15 +94,14 @@ class ModelTrainer:
         if self.market_data is not None:
             return self.market_data
 
-        try:
-            logger.info("Fetching market data (SPY)...")
-            ticker = yf.Ticker("SPY")
-            data = ticker.history(period="2y", interval="1d")
-            if not data.empty:
-                self.market_data = data
-                return data
-        except Exception as e:
-            logger.warning(f"Could not fetch market data: {e}")
+        from utils.yfinance_helpers import fetch_ticker_data
+
+        logger.info("Fetching market data (SPY)...")
+        data = fetch_ticker_data("SPY", period="2y", interval="1d")
+        if data is not None and not data.empty:
+            self.market_data = data
+            return data
+        logger.warning("Could not fetch market data for SPY")
         return None
 
     def get_market_features(self, date: pd.Timestamp) -> Dict[str, float]:
@@ -144,7 +144,7 @@ class ModelTrainer:
 
     def fetch_stock_data(self, symbol: str, period: str = "2y") -> Optional[pd.DataFrame]:
         """
-        Fetch historical stock data
+        Fetch historical stock data with retry logic
 
         Args:
             symbol: Stock ticker symbol
@@ -153,20 +153,19 @@ class ModelTrainer:
         Returns:
             DataFrame with OHLCV data or None if failed
         """
-        try:
-            logger.info(f"Fetching data for {symbol}...")
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(period=period, interval="1d")
+        from utils.yfinance_helpers import fetch_ticker_data
 
-            if data.empty or len(data) < MIN_SAMPLES_PER_STOCK:
-                logger.warning(f"Insufficient data for {symbol}: {len(data)} samples")
-                return None
+        logger.info(f"Fetching data for {symbol}...")
+        data = fetch_ticker_data(symbol, period=period, interval="1d")
 
-            return data
-
-        except Exception as e:
-            logger.error(f"Error fetching {symbol}: {e}")
+        if data is None:
             return None
+
+        if len(data) < MIN_SAMPLES_PER_STOCK:
+            logger.warning(f"Insufficient data for {symbol}: {len(data)} samples")
+            return None
+
+        return data
 
     def create_features(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -234,7 +233,9 @@ class ModelTrainer:
         all_features = []
         all_targets = []
 
-        for symbol in symbols:
+        for i, symbol in enumerate(symbols):
+            if i > 0:
+                time.sleep(0.5)  # Rate limiting between yfinance requests
             data = self.fetch_stock_data(symbol)
             if data is None:
                 continue

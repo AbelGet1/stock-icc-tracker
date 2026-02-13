@@ -5,6 +5,7 @@ This document serves as the comprehensive project brain for Claude interactions.
 ## Project Identity
 
 **Name**: StockScout (formerly stock-icc-tracker)
+**Repo**: https://github.com/AbelGet1/stockscout
 **Purpose**: Daily stock tracker with ML-powered insights for informed decision-making
 **Philosophy**: Educational tool to help users understand market signals - NOT a trading signal generator
 
@@ -80,16 +81,21 @@ stockscout/
 │   │   └── stock_analyzer/
 │   │       └── handler.py      # Lambda function
 │   └── utils/
-│       └── indicators.py       # Technical indicators (15+)
+│       ├── indicators.py       # Technical indicators (15+)
+│       ├── rate_limiter.py     # DynamoDB-backed rate limiter
+│       └── yfinance_helpers.py # Centralized yfinance with retry/backoff
 ├── terraform/
 │   ├── main.tf                 # AWS infrastructure
 │   └── variables.tf            # Terraform variables
 ├── tests/
-│   └── test_indicators.py      # Unit tests
+│   ├── test_indicators.py      # Technical indicator tests
+│   ├── test_rate_limiter.py    # Rate limiter tests
+│   └── test_yfinance_helpers.py # yfinance helper tests
 ├── .env.example                # Environment template
 ├── CLAUDE.md                   # This file
 ├── README.md                   # User documentation
-└── requirements.txt            # Python dependencies
+├── requirements.txt            # Python dependencies
+└── setup.sh                    # Development environment setup
 ```
 
 ## ML Model Details
@@ -137,7 +143,8 @@ stockscout/
 |----------|--------|---------|
 | `/` | GET | Health check |
 | `/modes` | GET | List user modes and thresholds |
-| `/model/info` | GET | Model metadata and version |
+| `/model/info` | GET | Model metadata, version, and staleness |
+| `/model/health` | GET | Model health check (200 or 503 if stale) |
 | `/predict` | POST | Get predictions for multiple stocks |
 | `/predict/{symbol}` | GET | Single stock prediction |
 | `/threshold-analysis` | GET | Precision/recall curves |
@@ -227,6 +234,7 @@ Every prediction response includes:
 | DynamoDB | stockscout-subscriptions | Email subscriptions |
 | Lambda | stockscout-analyzer | Stock analysis |
 | EventBridge | stockscout-analysis-schedule | Scheduled triggers |
+| DynamoDB | stockscout-rate-limits | Rate limiting (TTL-enabled) |
 | IAM Role | stockscout-lambda-role | Lambda permissions |
 
 ## Development Workflow
@@ -273,20 +281,19 @@ terraform apply
 1. Edit `src/config/sp500_top50.py`
 2. Stocks automatically included in next training run
 
-## Known Issues & Limitations
+## Known Issues & Limitations (Addressed)
 
-1. **yfinance rate limiting**: May fail with too many concurrent requests
-2. **Model staleness**: Needs weekly retraining to stay current
-3. **In-memory rate limiting**: Resets on Lambda cold start (use Redis for production)
-4. **Homebrew on M1/M2**: User has Intel Homebrew, may cause issues
+1. **yfinance rate limiting**: Fixed - centralized `src/utils/yfinance_helpers.py` with exponential backoff, jitter, and inter-request delays. All 3 consumer files updated.
+2. **Model staleness**: Fixed - `check_model_staleness()` validates model age. `/model/health` endpoint returns 503 if stale. `/predict` includes `model_warning` when model > 8 days old.
+3. **In-memory rate limiting**: Fixed - DynamoDB-backed `src/utils/rate_limiter.py` with atomic counters and TTL cleanup. Falls back to in-memory if DynamoDB unavailable. Table: `stockscout-rate-limits`.
+4. **Homebrew on M1/M2**: Fixed - `setup.sh` detects architecture, warns about Intel Homebrew on Apple Silicon, sets up venv, installs deps.
 
 ## Future Enhancements (Backlog)
 
 1. **Phase 2**: Risk scoring for individual stocks
 2. **Phase 3**: Walk-forward backtesting + performance transparency
 3. **Phase 4**: Market regime detection + adaptive behavior
-4. **Redis rate limiting**: For production scalability
-5. **Frontend dashboard**: React/Next.js visualization
+4. **Frontend dashboard**: React/Next.js visualization
 
 ## Environment Variables
 
@@ -308,9 +315,14 @@ LAMBDA_FUNCTION_NAME=stockscout-analyzer
 PATTERNS_TABLE_NAME=stockscout-patterns
 SUBSCRIPTIONS_TABLE_NAME=stockscout-subscriptions
 
+# Rate Limiting (DynamoDB)
+RATE_LIMIT_TABLE_NAME=stockscout-rate-limits
+
 # Model
 MODEL_PATH=models/current_model.joblib
 METADATA_PATH=models/current_metadata.json
+MODEL_MAX_AGE_DAYS=10
+MODEL_WARNING_AGE_DAYS=8
 ```
 
 ## Conversation History Notes

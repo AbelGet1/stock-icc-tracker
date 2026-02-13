@@ -132,6 +132,27 @@ resource "aws_dynamodb_table" "subscriptions" {
   }
 }
 
+# DynamoDB Table for rate limiting (persistent across cold starts)
+resource "aws_dynamodb_table" "rate_limits" {
+  name         = "${var.app_name}-rate-limits"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  point_in_time_recovery {
+    enabled = false # Rate limit data is transient, no need for backups
+  }
+}
+
 # IAM Role for Lambda functions
 resource "aws_iam_role" "lambda_role" {
   name = "${var.app_name}-lambda-role"
@@ -181,7 +202,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
           aws_dynamodb_table.stock_patterns.arn,
           "${aws_dynamodb_table.stock_patterns.arn}/*",
           aws_dynamodb_table.subscriptions.arn,
-          "${aws_dynamodb_table.subscriptions.arn}/*"
+          "${aws_dynamodb_table.subscriptions.arn}/*",
+          aws_dynamodb_table.rate_limits.arn,
+          "${aws_dynamodb_table.rate_limits.arn}/*"
         ]
       },
       {
@@ -232,9 +255,10 @@ resource "aws_lambda_function" "stock_analyzer" {
 
   environment {
     variables = {
-      PATTERNS_TABLE = aws_dynamodb_table.stock_patterns.name
-      STORAGE_BUCKET = aws_s3_bucket.app_storage.bucket
-      SUBSCRIPTIONS_TABLE = aws_dynamodb_table.subscriptions.name
+      PATTERNS_TABLE        = aws_dynamodb_table.stock_patterns.name
+      STORAGE_BUCKET        = aws_s3_bucket.app_storage.bucket
+      SUBSCRIPTIONS_TABLE   = aws_dynamodb_table.subscriptions.name
+      RATE_LIMIT_TABLE_NAME = aws_dynamodb_table.rate_limits.name
     }
   }
 }

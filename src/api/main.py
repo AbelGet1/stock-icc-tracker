@@ -12,7 +12,6 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 import time
 import re
 
@@ -52,46 +51,36 @@ MAX_REQUESTS_PER_DAY = int(os.environ.get("MAX_REQUESTS_PER_DAY", "500"))
 # API key protection (optional - set in environment)
 API_KEY = os.environ.get("API_KEY", None)  # If set, requires X-API-Key header
 
-# Simple in-memory rate limiter (use Redis in production)
-_rate_limit_store: Dict[str, list] = defaultdict(list)
-_daily_request_count = {"count": 0, "date": datetime.now().date()}
+# Rate limiter - initialized after AWS clients are created (see below)
+_rate_limiter = None
 
 
-def check_rate_limit(client_ip: str) -> bool:
-    """Check if client has exceeded rate limit"""
-    now = time.time()
-    window_start = now - RATE_LIMIT_WINDOW
-
-    # Clean old entries
-    _rate_limit_store[client_ip] = [
-        t for t in _rate_limit_store[client_ip] if t > window_start
-    ]
-
-    # Check limit
-    if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
-        return False
-
-    # Record request
-    _rate_limit_store[client_ip].append(now)
-    return True
-
-
-def check_daily_limit() -> bool:
-    """Check if daily request limit exceeded (cost protection)"""
-    today = datetime.now().date()
-    if _daily_request_count["date"] != today:
-        _daily_request_count["count"] = 0
-        _daily_request_count["date"] = today
-
-    if _daily_request_count["count"] >= MAX_REQUESTS_PER_DAY:
-        return False
-
-    _daily_request_count["count"] += 1
-    return True
+def _get_rate_limiter():
+    """Lazy-initialize rate limiter with DynamoDB backend."""
+    global _rate_limiter
+    if _rate_limiter is None:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from utils.rate_limiter import RateLimiter
+        try:
+            _rate_limiter = RateLimiter(
+                requests_per_window=RATE_LIMIT_REQUESTS,
+                window_seconds=RATE_LIMIT_WINDOW,
+                daily_limit=MAX_REQUESTS_PER_DAY,
+                dynamodb_resource=dynamodb,
+            )
+        except Exception:
+            # If DynamoDB client not ready yet, create memory-only limiter
+            _rate_limiter = RateLimiter(
+                requests_per_window=RATE_LIMIT_REQUESTS,
+                window_seconds=RATE_LIMIT_WINDOW,
+                daily_limit=MAX_REQUESTS_PER_DAY,
+            )
+    return _rate_limiter
 
 
 async def rate_limit_dependency(request: Request):
-    """FastAPI dependency for rate limiting"""
+    """FastAPI dependency for rate limiting (DynamoDB-backed with in-memory fallback)"""
     client_ip = request.client.host if request.client else "unknown"
 
     # Check API key if configured
@@ -103,15 +92,17 @@ async def rate_limit_dependency(request: Request):
                 detail="Invalid or missing API key. Set X-API-Key header."
             )
 
+    limiter = _get_rate_limiter()
+
     # Check rate limit
-    if not check_rate_limit(client_ip):
+    if not limiter.check_rate_limit(client_ip):
         raise HTTPException(
             status_code=429,
             detail=f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW}s."
         )
 
     # Check daily limit (cost protection)
-    if not check_daily_limit():
+    if not limiter.check_daily_limit():
         raise HTTPException(
             status_code=429,
             detail=f"Daily limit exceeded ({MAX_REQUESTS_PER_DAY} requests). Try again tomorrow."
@@ -211,6 +202,10 @@ METADATA_PATH = os.environ.get('METADATA_PATH', os.path.join(
     os.path.dirname(__file__), '..', '..', 'models', 'current_metadata.json'
 ))
 
+# Model staleness thresholds (days)
+MODEL_MAX_AGE_DAYS = int(os.environ.get("MODEL_MAX_AGE_DAYS", "10"))
+MODEL_WARNING_AGE_DAYS = int(os.environ.get("MODEL_WARNING_AGE_DAYS", "8"))
+
 # Global model cache
 _model_cache = None
 _metadata_cache = None
@@ -245,6 +240,51 @@ def get_model_info() -> Dict[str, Any]:
         "cv_f1_score": metadata.get("metrics", {}).get("cv_f1_mean"),
         "threshold_analysis": metadata.get("metrics", {}).get("threshold_analysis", [])
     }
+
+
+def check_model_staleness() -> Dict[str, Any]:
+    """Check if the loaded model is stale based on its training timestamp."""
+    _, metadata = load_model()
+    timestamp_str = metadata.get("timestamp")
+
+    if not timestamp_str:
+        return {
+            "is_stale": True,
+            "is_warning": True,
+            "age_days": None,
+            "message": "Model has no training timestamp - cannot verify freshness"
+        }
+
+    try:
+        trained_at = datetime.fromisoformat(timestamp_str)
+        age = datetime.now() - trained_at
+        age_days = age.days
+
+        is_stale = age_days > MODEL_MAX_AGE_DAYS
+        is_warning = age_days > MODEL_WARNING_AGE_DAYS
+
+        if is_stale:
+            message = f"Model is {age_days} days old (max: {MODEL_MAX_AGE_DAYS}). Predictions may be less accurate."
+        elif is_warning:
+            message = f"Model is {age_days} days old. Approaching staleness threshold ({MODEL_MAX_AGE_DAYS} days)."
+        else:
+            message = f"Model is {age_days} days old. Within acceptable range."
+
+        return {
+            "is_stale": is_stale,
+            "is_warning": is_warning,
+            "age_days": age_days,
+            "trained_at": timestamp_str,
+            "max_age_days": MODEL_MAX_AGE_DAYS,
+            "message": message
+        }
+    except (ValueError, TypeError) as e:
+        return {
+            "is_stale": True,
+            "is_warning": True,
+            "age_days": None,
+            "message": f"Could not parse model timestamp: {e}"
+        }
 
 # AWS clients
 # NOTE: boto3 requires a region; in CI/tests we may not have AWS config.
@@ -493,19 +533,55 @@ async def get_model_metadata():
     """
     Get information about the currently loaded ML model
 
-    Returns training date, performance metrics, and feature count.
+    Returns training date, performance metrics, feature count, and staleness info.
     """
     try:
         info = get_model_info()
+        staleness = check_model_staleness()
         return {
             "model": info,
             "status": "loaded",
+            "staleness": staleness,
             "modes_available": list(MODE_THRESHOLDS.keys())
         }
     except HTTPException as e:
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/model/health")
+async def check_model_health():
+    """
+    Check model health including staleness and readiness.
+
+    Returns HTTP 200 if model is healthy, 503 if stale.
+    """
+    try:
+        staleness = check_model_staleness()
+        info = get_model_info()
+
+        health = {
+            "healthy": not staleness["is_stale"],
+            "model_version": info.get("version"),
+            "staleness": staleness,
+            "training_schedule": "Weekly (Sunday 6 AM UTC)"
+        }
+
+        if staleness["is_stale"]:
+            return JSONResponse(status_code=503, content=health)
+
+        return health
+    except HTTPException as e:
+        return JSONResponse(
+            status_code=503,
+            content={"healthy": False, "error": str(e.detail)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"healthy": False, "error": str(e)}
+        )
 
 
 @app.post("/predict")
@@ -544,16 +620,15 @@ async def predict_stocks(request: PredictionRequest):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
         from utils.indicators import get_ml_features
 
-        import yfinance as yf
+        from utils.yfinance_helpers import fetch_ticker_data
 
         results = []
         for symbol in request.symbols:
             try:
-                # Fetch recent data
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="1y", interval="1d")
+                # Fetch recent data with retry logic
+                data = fetch_ticker_data(symbol, period="1y", interval="1d")
 
-                if data.empty or len(data) < 200:
+                if data is None or data.empty or len(data) < 200:
                     results.append({
                         "symbol": symbol.upper(),
                         "error": "Insufficient data",
@@ -577,7 +652,8 @@ async def predict_stocks(request: PredictionRequest):
                 probability = model.predict_proba(X)[0][1]
 
                 # Apply threshold
-                signal = probability >= threshold
+                probability = float(probability)
+                signal = bool(probability >= threshold)
                 signal_strength = "strong" if probability >= 0.70 else \
                                   "moderate" if probability >= 0.55 else \
                                   "weak" if probability >= 0.45 else "none"
@@ -604,12 +680,20 @@ async def predict_stocks(request: PredictionRequest):
                     "signal": None
                 })
 
-        return {
+        response_data = {
             "predictions": results,
             "mode_info": mode_info,
             "timestamp": datetime.now().isoformat(),
             "disclaimer": "This is not investment advice. Past performance does not guarantee future results."
         }
+
+        # Add staleness warning if model is old
+        staleness = check_model_staleness()
+        if staleness.get("is_warning") or staleness.get("is_stale"):
+            response_data["model_warning"] = staleness["message"]
+            response_data["model_age_days"] = staleness.get("age_days")
+
+        return response_data
 
     except HTTPException as e:
         raise e

@@ -38,20 +38,13 @@ class ICCDetector:
         self.subscriptions_table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
     
     def get_stock_data(self, symbol: str, period: str = "3mo", interval: str = "1d") -> Optional[pd.DataFrame]:
-        """Get stock data using yfinance"""
-        try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(period=period, interval=interval)
-            
-            if data.empty:
-                logger.warning(f"No data found for symbol: {symbol}")
-                return None
-                
-            return data
-        except Exception as e:
-            logger.error(f"Error fetching data for {symbol}: {e}")
-            return None
+        """Get stock data using yfinance with retry logic"""
+        from utils.yfinance_helpers import fetch_ticker_data
+
+        data = fetch_ticker_data(symbol, period=period, interval=interval)
+        if data is None:
+            logger.warning(f"No data found for symbol: {symbol}")
+        return data
     
     def analyze_stock(self, symbol: str, timeframe: str = "1d") -> Dict:
         """Main analysis function for ICC pattern detection"""
