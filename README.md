@@ -22,17 +22,33 @@ StockScout analyzes S&P 500 stocks using machine learning to identify favorable 
 
 ## Quick Start
 
-```bash
-# Clone and install
-git clone https://github.com/your-username/stockscout.git
-cd stockscout
-pip install -r requirements.txt
+### Prerequisites
+- Python 3.9+ (check with `python3 --version`)
+- macOS or Linux
 
-# Run locally
+### Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/AbelGet1/stockscout.git
+cd stockscout
+
+# Run the setup script (creates venv, installs deps, verifies everything)
+bash setup.sh
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Train a test model (fetches live stock data, takes ~2 minutes)
+python scripts/train_model.py --test --local
+
+# Start the API
 uvicorn src.api.main:app --reload
 
 # Access API at http://127.0.0.1:8000
 ```
+
+> **Note:** The `--test` flag trains on 5 stocks instead of 50 for speed. The `--local` flag saves the model locally instead of uploading to S3.
 
 ## API Usage
 
@@ -65,7 +81,8 @@ curl -X POST http://localhost:8000/predict \
 |----------|-------------|
 | `GET /` | Health check |
 | `GET /modes` | Available user modes and thresholds |
-| `GET /model/info` | Current model version and metrics |
+| `GET /model/info` | Model version, metrics, and staleness |
+| `GET /model/health` | Model health check (200 if fresh, 503 if stale) |
 | `POST /predict` | Get ML predictions for stocks |
 | `GET /predict/{symbol}` | Quick single-stock prediction |
 | `GET /threshold-analysis` | Precision/recall at different thresholds |

@@ -83,7 +83,8 @@ echo ""
 # 3. Find a suitable Python (3.9+)
 # ------------------------------------------------------------------
 PYTHON_CMD=""
-for cmd in python3.12 python3.11 python3.10 python3.9 python3 /usr/local/bin/python3.14 /usr/local/bin/python3.12 /usr/local/bin/python3.11 /usr/bin/python3; do
+# Search stable Python versions first, avoid bleeding-edge (3.13+)
+for cmd in python3.12 python3.11 python3.10 python3.9 /usr/bin/python3 /usr/local/bin/python3.12 /usr/local/bin/python3.11 /usr/local/bin/python3.10 /usr/local/bin/python3.9 python3; do
     if command -v "$cmd" &> /dev/null; then
         VERSION=$("$cmd" --version 2>&1 | awk '{print $2}') || continue
         if [ -z "$VERSION" ]; then
